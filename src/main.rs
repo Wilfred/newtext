@@ -65,9 +65,10 @@ fn main() {
         let path = entry.path();
 
         // Skip .git directory and other hidden directories
-        if path.components().any(|c| {
-            c.as_os_str().to_string_lossy().starts_with('.')
-        }) {
+        if path
+            .components()
+            .any(|c| c.as_os_str().to_string_lossy().starts_with('.'))
+        {
             continue;
         }
 
@@ -86,7 +87,10 @@ fn main() {
         }
     }
 
-    println!("\nProcessed {} files, modified {} files", files_processed, files_modified);
+    println!(
+        "\nProcessed {} files, modified {} files",
+        files_processed, files_modified
+    );
 }
 
 fn process_file(path: &Path, find: &str, replace: &str, regex: Option<&Regex>) -> io::Result<bool> {
