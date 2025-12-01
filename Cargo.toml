@@ -3,6 +3,9 @@ name = "newtext"
 version = "0.1.0"
 edition = "2021"
 
+[dependencies]
+walkdir = "2"
+
 [[bin]]
 name = "newtext"
 path = "src/main.rs"
