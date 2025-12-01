@@ -1,4 +1,5 @@
 use clap::Parser;
+use regex::Regex;
 use std::env;
 use std::fs;
 use std::io;
@@ -18,6 +19,10 @@ struct Cli {
     /// The text to replace with
     #[arg(value_name = "REPLACE")]
     replace: String,
+
+    /// Treat the find string as a regular expression pattern
+    #[arg(short = 'p', long = "pattern")]
+    pattern: bool,
 }
 
 fn main() {
@@ -27,6 +32,19 @@ fn main() {
         eprintln!("Error: find string cannot be empty");
         std::process::exit(1);
     }
+
+    // If using regex mode, compile the regex pattern
+    let regex = if cli.pattern {
+        match Regex::new(&cli.find) {
+            Ok(re) => Some(re),
+            Err(e) => {
+                eprintln!("Error: Invalid regex pattern: {}", e);
+                std::process::exit(1);
+            }
+        }
+    } else {
+        None
+    };
 
     let current_dir = match env::current_dir() {
         Ok(dir) => dir,
@@ -47,13 +65,14 @@ fn main() {
         let path = entry.path();
 
         // Skip .git directory and other hidden directories
-        if path.components().any(|c| {
-            c.as_os_str().to_string_lossy().starts_with('.')
-        }) {
+        if path
+            .components()
+            .any(|c| c.as_os_str().to_string_lossy().starts_with('.'))
+        {
             continue;
         }
 
-        match process_file(path, &cli.find, &cli.replace) {
+        match process_file(path, &cli.find, &cli.replace, regex.as_ref()) {
             Ok(true) => {
                 files_modified += 1;
                 files_processed += 1;
@@ -68,10 +87,13 @@ fn main() {
         }
     }
 
-    println!("\nProcessed {} files, modified {} files", files_processed, files_modified);
+    println!(
+        "\nProcessed {} files, modified {} files",
+        files_processed, files_modified
+    );
 }
 
-fn process_file(path: &Path, find: &str, replace: &str) -> io::Result<bool> {
+fn process_file(path: &Path, find: &str, replace: &str, regex: Option<&Regex>) -> io::Result<bool> {
     // Try to read the file as text
     let content = match fs::read_to_string(path) {
         Ok(c) => c,
@@ -81,13 +103,25 @@ fn process_file(path: &Path, find: &str, replace: &str) -> io::Result<bool> {
         }
     };
 
-    // Check if the file contains the search string
-    if !content.contains(find) {
+    // Perform replacement based on mode
+    let new_content = if let Some(re) = regex {
+        // Regex mode
+        if !re.is_match(&content) {
+            return Ok(false);
+        }
+        re.replace_all(&content, replace).to_string()
+    } else {
+        // Literal mode
+        if !content.contains(find) {
+            return Ok(false);
+        }
+        content.replace(find, replace)
+    };
+
+    // Only write if content actually changed
+    if new_content == content {
         return Ok(false);
     }
-
-    // Replace all occurrences
-    let new_content = content.replace(find, replace);
 
     // Write back to the file
     fs::write(path, new_content)?;
