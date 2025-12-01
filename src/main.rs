@@ -1,22 +1,29 @@
+use clap::Parser;
 use std::env;
 use std::fs;
 use std::io;
 use std::path::Path;
 use walkdir::WalkDir;
 
+/// A simple find and replace tool that processes all text files in the current directory
+#[derive(Parser)]
+#[command(name = "newtext")]
+#[command(version)]
+#[command(about = "Find and replace text in all files in the current directory", long_about = None)]
+struct Cli {
+    /// The text to search for
+    #[arg(value_name = "FIND")]
+    find: String,
+
+    /// The text to replace with
+    #[arg(value_name = "REPLACE")]
+    replace: String,
+}
+
 fn main() {
-    let args: Vec<String> = env::args().collect();
+    let cli = Cli::parse();
 
-    if args.len() != 3 {
-        eprintln!("Usage: newtext <find> <replace>");
-        eprintln!("Replaces all occurrences of <find> with <replace> in all files in the current directory");
-        std::process::exit(1);
-    }
-
-    let find = &args[1];
-    let replace = &args[2];
-
-    if find.is_empty() {
+    if cli.find.is_empty() {
         eprintln!("Error: find string cannot be empty");
         std::process::exit(1);
     }
@@ -46,7 +53,7 @@ fn main() {
             continue;
         }
 
-        match process_file(path, find, replace) {
+        match process_file(path, &cli.find, &cli.replace) {
             Ok(true) => {
                 files_modified += 1;
                 files_processed += 1;
