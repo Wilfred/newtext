@@ -13,11 +13,11 @@ use std::path::Path;
 #[command(about = "Find and replace text in all files in the current directory", long_about = None)]
 struct Cli {
     /// The text to search for
-    #[arg(value_name = "FIND")]
+    #[arg(value_name = "OLD")]
     find: String,
 
     /// The text to replace with
-    #[arg(value_name = "REPLACE")]
+    #[arg(value_name = "NEW")]
     replace: String,
 
     /// Treat the find string as a regular expression pattern
