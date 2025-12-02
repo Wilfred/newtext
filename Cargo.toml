@@ -8,6 +8,7 @@ walkdir = "2"
 clap = { version = "4.5", features = ["derive"] }
 regex = "1"
 ignore = "0.4"
+globset = "0.4"
 
 [[bin]]
 name = "newtext"

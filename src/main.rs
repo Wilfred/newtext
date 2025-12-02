@@ -1,4 +1,5 @@
 use clap::Parser;
+use globset::Glob;
 use ignore::WalkBuilder;
 use regex::Regex;
 use std::env;
@@ -27,6 +28,10 @@ struct Cli {
     /// Case-insensitive matching with case-preserving replacement
     #[arg(short = 'i', long = "ignore-case")]
     ignore_case: bool,
+
+    /// Only process files matching this glob pattern (e.g., "*.js", "**/*.rs")
+    #[arg(short = 'g', long = "glob")]
+    glob: Option<String>,
 }
 
 fn main() {
@@ -48,6 +53,19 @@ fn main() {
             Ok(re) => Some(re),
             Err(e) => {
                 eprintln!("Error: Invalid regex pattern: {}", e);
+                std::process::exit(1);
+            }
+        }
+    } else {
+        None
+    };
+
+    // If a glob pattern is specified, compile it
+    let glob_matcher = if let Some(glob_pattern) = &cli.glob {
+        match Glob::new(glob_pattern) {
+            Ok(glob) => Some(glob.compile_matcher()),
+            Err(e) => {
+                eprintln!("Error: Invalid glob pattern: {}", e);
                 std::process::exit(1);
             }
         }
@@ -89,6 +107,13 @@ fn main() {
         }
 
         let path = entry.path();
+
+        // If a glob pattern is specified, check if the file matches
+        if let Some(ref matcher) = glob_matcher {
+            if !matcher.is_match(path) {
+                continue;
+            }
+        }
 
         match process_file(path, &cli.old, &cli.new, regex.as_ref(), cli.ignore_case) {
             Ok(true) => {
