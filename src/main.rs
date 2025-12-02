@@ -23,6 +23,10 @@ struct Cli {
     /// Treat the find string as a regular expression pattern
     #[arg(short = 'p', long = "pattern")]
     pattern: bool,
+
+    /// Case-insensitive matching with case-preserving replacement
+    #[arg(short = 'i', long = "ignore-case")]
+    ignore_case: bool,
 }
 
 fn main() {
@@ -35,7 +39,12 @@ fn main() {
 
     // If using regex mode, compile the regex pattern
     let regex = if cli.pattern {
-        match Regex::new(&cli.old) {
+        let pattern = if cli.ignore_case {
+            format!("(?i){}", cli.old)
+        } else {
+            cli.old.clone()
+        };
+        match Regex::new(&pattern) {
             Ok(re) => Some(re),
             Err(e) => {
                 eprintln!("Error: Invalid regex pattern: {}", e);
@@ -81,7 +90,7 @@ fn main() {
 
         let path = entry.path();
 
-        match process_file(path, &cli.old, &cli.new, regex.as_ref()) {
+        match process_file(path, &cli.old, &cli.new, regex.as_ref(), cli.ignore_case) {
             Ok(true) => {
                 files_modified += 1;
                 files_processed += 1;
@@ -105,7 +114,86 @@ fn main() {
     eprintln!();
 }
 
-fn process_file(path: &Path, old: &str, new: &str, regex: Option<&Regex>) -> io::Result<bool> {
+/// Apply the case pattern from the matched text to the replacement text
+fn apply_case_pattern(matched: &str, replacement: &str) -> String {
+    // If the matched text has no letters, just return the replacement as-is
+    if !matched.chars().any(|c| c.is_alphabetic()) {
+        return replacement.to_string();
+    }
+
+    let matched_chars: Vec<char> = matched.chars().collect();
+
+    // Determine case pattern of matched text
+    let alphabetic_chars: Vec<char> = matched_chars
+        .iter()
+        .filter(|c| c.is_alphabetic())
+        .copied()
+        .collect();
+
+    if alphabetic_chars.is_empty() {
+        return replacement.to_string();
+    }
+
+    let all_upper = alphabetic_chars.iter().all(|c| c.is_uppercase());
+    let all_lower = alphabetic_chars.iter().all(|c| c.is_lowercase());
+    let first_upper = alphabetic_chars[0].is_uppercase()
+        && alphabetic_chars[1..].iter().all(|c| c.is_lowercase());
+
+    if all_upper {
+        // All uppercase: BAR -> BAR
+        replacement.to_uppercase()
+    } else if all_lower {
+        // All lowercase: bar -> bar
+        replacement.to_lowercase()
+    } else if first_upper {
+        // Title case: Bar -> Bar
+        let mut result = String::new();
+        let mut first_letter = true;
+        for c in replacement.chars() {
+            if c.is_alphabetic() {
+                if first_letter {
+                    result.push_str(&c.to_uppercase().to_string());
+                    first_letter = false;
+                } else {
+                    result.push_str(&c.to_lowercase().to_string());
+                }
+            } else {
+                result.push(c);
+            }
+        }
+        result
+    } else {
+        // Mixed case (including camelCase): try to preserve pattern character by character
+        let mut result = String::new();
+        let mut matched_alpha_iter = alphabetic_chars.iter();
+
+        for c in replacement.chars() {
+            if c.is_alphabetic() {
+                if let Some(&matched_c) = matched_alpha_iter.next() {
+                    if matched_c.is_uppercase() {
+                        result.push_str(&c.to_uppercase().to_string());
+                    } else {
+                        result.push_str(&c.to_lowercase().to_string());
+                    }
+                } else {
+                    // If we run out of matched characters, keep the original case
+                    result.push(c);
+                }
+            } else {
+                result.push(c);
+            }
+        }
+        result
+    }
+}
+
+fn process_file(
+    path: &Path,
+    old: &str,
+    new: &str,
+    regex: Option<&Regex>,
+    ignore_case: bool,
+) -> io::Result<bool> {
     // Try to read the file as text
     let content = match fs::read_to_string(path) {
         Ok(c) => c,
@@ -117,13 +205,33 @@ fn process_file(path: &Path, old: &str, new: &str, regex: Option<&Regex>) -> io:
 
     // Perform replacement based on mode
     let new_content = if let Some(re) = regex {
-        // Regex mode
+        // Regex mode (ignore_case is already handled in regex compilation)
         if !re.is_match(&content) {
             return Ok(false);
         }
         re.replace_all(&content, new).to_string()
+    } else if ignore_case {
+        // Literal mode with case-insensitive matching and case-preserving replacement
+        // Use regex for safe case-insensitive matching
+        let pattern = format!("(?i){}", regex::escape(old));
+        let re = match Regex::new(&pattern) {
+            Ok(r) => r,
+            Err(_) => return Ok(false),
+        };
+
+        if !re.is_match(&content) {
+            return Ok(false);
+        }
+
+        // Replace all matches with case-preserved versions
+        let result = re.replace_all(&content, |caps: &regex::Captures| {
+            let matched = caps.get(0).unwrap().as_str();
+            apply_case_pattern(matched, new)
+        });
+
+        result.to_string()
     } else {
-        // Literal mode
+        // Literal mode (case-sensitive)
         if !content.contains(old) {
             return Ok(false);
         }
