@@ -62,7 +62,14 @@ fn main() {
 
     // If a glob pattern is specified, compile it
     let glob_matcher = if let Some(glob_pattern) = &cli.glob {
-        match Glob::new(glob_pattern) {
+        // Make the pattern recursive by default if it doesn't already start with **/
+        let pattern = if glob_pattern.starts_with("**/") {
+            glob_pattern.clone()
+        } else {
+            format!("**/{}", glob_pattern)
+        };
+
+        match Glob::new(&pattern) {
             Ok(glob) => Some(glob.compile_matcher()),
             Err(e) => {
                 eprintln!("Error: Invalid glob pattern: {}", e);
