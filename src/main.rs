@@ -56,6 +56,7 @@ fn main() {
 
     let mut files_processed = 0;
     let mut files_modified = 0;
+    let mut directories_traversed = 0;
 
     for result in WalkBuilder::new(&current_dir)
         .hidden(false) // Don't automatically skip hidden files/dirs
@@ -66,6 +67,12 @@ fn main() {
             Ok(entry) => entry,
             Err(_) => continue,
         };
+
+        // Track directories
+        if entry.file_type().map(|ft| ft.is_dir()).unwrap_or(false) {
+            directories_traversed += 1;
+            continue;
+        }
 
         // Only process files
         if !entry.file_type().map(|ft| ft.is_file()).unwrap_or(false) {
@@ -87,11 +94,19 @@ fn main() {
                 eprintln!("Warning: Could not process {}: {}", path.display(), e);
             }
         }
+
+        // Print progress update every 100 files
+        if files_processed % 100 == 0 && files_processed > 0 {
+            eprintln!(
+                "Progress: {} files processed, {} directories traversed, {} files modified",
+                files_processed, directories_traversed, files_modified
+            );
+        }
     }
 
     println!(
-        "\nProcessed {} files, modified {} files",
-        files_processed, files_modified
+        "\nProcessed {} files in {} directories, modified {} files",
+        files_processed, directories_traversed, files_modified
     );
 }
 
