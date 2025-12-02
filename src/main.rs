@@ -13,12 +13,12 @@ use std::path::Path;
 #[command(about = "Find and replace text in all files in the current directory", long_about = None)]
 struct Cli {
     /// The text to search for
-    #[arg(value_name = "FIND")]
-    find: String,
+    #[arg(value_name = "OLD")]
+    old: String,
 
     /// The text to replace with
-    #[arg(value_name = "REPLACE")]
-    replace: String,
+    #[arg(value_name = "NEW")]
+    new: String,
 
     /// Treat the find string as a regular expression pattern
     #[arg(short = 'p', long = "pattern")]
@@ -28,14 +28,14 @@ struct Cli {
 fn main() {
     let cli = Cli::parse();
 
-    if cli.find.is_empty() {
-        eprintln!("Error: find string cannot be empty");
+    if cli.old.is_empty() {
+        eprintln!("Error: old string cannot be empty");
         std::process::exit(1);
     }
 
     // If using regex mode, compile the regex pattern
     let regex = if cli.pattern {
-        match Regex::new(&cli.find) {
+        match Regex::new(&cli.old) {
             Ok(re) => Some(re),
             Err(e) => {
                 eprintln!("Error: Invalid regex pattern: {}", e);
@@ -81,7 +81,7 @@ fn main() {
 
         let path = entry.path();
 
-        match process_file(path, &cli.find, &cli.replace, regex.as_ref()) {
+        match process_file(path, &cli.old, &cli.new, regex.as_ref()) {
             Ok(true) => {
                 files_modified += 1;
                 files_processed += 1;
@@ -105,7 +105,7 @@ fn main() {
     eprintln!();
 }
 
-fn process_file(path: &Path, find: &str, replace: &str, regex: Option<&Regex>) -> io::Result<bool> {
+fn process_file(path: &Path, old: &str, new: &str, regex: Option<&Regex>) -> io::Result<bool> {
     // Try to read the file as text
     let content = match fs::read_to_string(path) {
         Ok(c) => c,
@@ -121,13 +121,13 @@ fn process_file(path: &Path, find: &str, replace: &str, regex: Option<&Regex>) -
         if !re.is_match(&content) {
             return Ok(false);
         }
-        re.replace_all(&content, replace).to_string()
+        re.replace_all(&content, new).to_string()
     } else {
         // Literal mode
-        if !content.contains(find) {
+        if !content.contains(old) {
             return Ok(false);
         }
-        content.replace(find, replace)
+        content.replace(old, new)
     };
 
     // Only write if content actually changed
