@@ -95,17 +95,18 @@ fn main() {
             }
         }
 
-        // Print progress update every 100 files
-        if files_processed % 100 == 0 && files_processed > 0 {
-            eprintln!(
-                "Progress: {} files processed, {} directories traversed, {} files modified",
-                files_processed, directories_traversed, files_modified
-            );
-        }
+        // Print progress update (overwrite same line)
+        eprint!(
+            "\rFiles: {}, Dirs: {}, Modified: {}",
+            files_processed, directories_traversed, files_modified
+        );
     }
 
+    // Print newline after progress updates
+    eprintln!();
+
     println!(
-        "\nProcessed {} files in {} directories, modified {} files",
+        "\nTotal: {} files, {} dirs, {} modified",
         files_processed, directories_traversed, files_modified
     );
 }
