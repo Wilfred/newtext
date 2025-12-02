@@ -1,10 +1,10 @@
 use clap::Parser;
+use ignore::WalkBuilder;
 use regex::Regex;
 use std::env;
 use std::fs;
 use std::io;
 use std::path::Path;
-use walkdir::WalkDir;
 
 /// A simple find and replace tool that processes all text files in the current directory
 #[derive(Parser)]
@@ -57,20 +57,22 @@ fn main() {
     let mut files_processed = 0;
     let mut files_modified = 0;
 
-    for entry in WalkDir::new(&current_dir)
-        .into_iter()
-        .filter_map(|e| e.ok())
-        .filter(|e| e.file_type().is_file())
+    for result in WalkBuilder::new(&current_dir)
+        .hidden(false) // Don't automatically skip hidden files/dirs
+        .standard_filters(true) // Use standard VCS filters (ignores .git, etc)
+        .build()
     {
-        let path = entry.path();
+        let entry = match result {
+            Ok(entry) => entry,
+            Err(_) => continue,
+        };
 
-        // Skip .git directory and other hidden directories
-        if path
-            .components()
-            .any(|c| c.as_os_str().to_string_lossy().starts_with('.'))
-        {
+        // Only process files
+        if !entry.file_type().map(|ft| ft.is_file()).unwrap_or(false) {
             continue;
         }
+
+        let path = entry.path();
 
         match process_file(path, &cli.find, &cli.replace, regex.as_ref()) {
             Ok(true) => {
