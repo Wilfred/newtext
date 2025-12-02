@@ -85,7 +85,6 @@ fn main() {
             Ok(true) => {
                 files_modified += 1;
                 files_processed += 1;
-                println!("Modified: {}", path.display());
             }
             Ok(false) => {
                 files_processed += 1;
