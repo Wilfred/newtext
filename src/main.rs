@@ -95,9 +95,9 @@ fn main() {
             }
         }
 
-        // Print progress update (overwrite same line)
+        // Print progress update (clear line and overwrite)
         eprint!(
-            "\rFiles: {}, Dirs: {}, Modified: {}",
+            "\x1b[2K\rFiles: {}, Dirs: {}, Modified: {}",
             files_processed, directories_traversed, files_modified
         );
     }
