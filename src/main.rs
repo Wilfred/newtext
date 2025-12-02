@@ -103,11 +103,6 @@ fn main() {
 
     // Print newline after progress updates
     eprintln!();
-
-    println!(
-        "\nTotal: {} files, {} dirs, {} modified",
-        files_processed, directories_traversed, files_modified
-    );
 }
 
 fn process_file(path: &Path, find: &str, replace: &str, regex: Option<&Regex>) -> io::Result<bool> {
